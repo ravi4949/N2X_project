@@ -1,6 +1,6 @@
 """
 ================================================================================
-N2X Model — Task 10 & 11: Visualization & Plotting (3D)
+N2X Model : Visualization & Plotting (3D)
 ================================================================================
 Generates publication-quality 3D plots:
     Fig 1 — Training loss curve (train vs validation)
@@ -316,6 +316,110 @@ def plot_dashboard_3d(data, save_path):
     print(f"  Saved: {save_path}")
 
 
+def plot_pinn_results(save_path):
+    path = 'results/pinn_results.json'
+    if not os.path.exists(path): return
+    with open(path) as f: res = json.load(f)
+    hist = res['history']
+    ep = np.arange(1, len(hist['total_loss'])+1)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
+    ax = axes[0]
+    ax.semilogy(ep, hist['total_loss'], color='#9C27B0', lw=2, label='Total Loss (MSE + Physics)')
+    ax.semilogy(ep, hist['mse_loss'],   color='#2196F3', lw=2, ls='--', label='MSE Loss')
+    ax.semilogy(ep, hist['val_mse'],    color='#FF9800', lw=2, ls=':',  label='Validation MSE')
+    ax.set_xlabel('Epoch'); ax.set_ylabel('Loss (log scale)')
+    ax.set_title('3D PINN Training Loss'); ax.legend()
+
+    ax = axes[1]
+    spd_vals = np.clip(hist['spd_loss'], 1e-12, None)
+    ax.semilogy(ep, spd_vals, color='#E91E63', lw=2)
+    ax.set_xlabel('Epoch'); ax.set_ylabel(r'SPD Penalty $L_{SPD}$')
+    ax.set_title(r'Positive-Definiteness Penalty ($C \succ 0$)')
+
+    fig.suptitle('3D PINN (Physics-Informed NN) Results', fontweight='bold', y=1.02)
+    plt.tight_layout(); plt.savefig(save_path); plt.close()
+    print(f"  Saved: {save_path}")
+
+
+def plot_spectral_equivariance(save_path):
+    path = 'results/spectral_results.json'
+    if not os.path.exists(path): return
+    with open(path) as f: res = json.load(f)
+    
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    angles = np.array(res['rotation_angles']) * 180 / np.pi
+    dir_errs  = np.clip(res['frob_errors_direct'], 1e-12, None)
+    spec_errs = np.clip(res['frob_errors_spectral'], 1e-12, None)
+
+    ax.scatter(angles, dir_errs,  color='#F44336', alpha=0.7, s=25, label='Direct NN (Raw Invariants)')
+    ax.scatter(angles, spec_errs, color='#4CAF50', alpha=0.9, s=35, label='Spectral Method (Exact Frame Invariance)')
+    ax.set_yscale('log')
+    ax.set_xlabel(r'3D Rotation Angle $\alpha$ (degrees)')
+    ax.set_ylabel('Relative Rotational Frame Error')
+    ax.set_title('3D Rotational Frame Equivariance Proof (SO(3) Invariance)')
+    ax.legend()
+    plt.tight_layout(); plt.savefig(save_path); plt.close()
+    print(f"  Saved: {save_path}")
+
+
+
+def plot_tbnn_results(save_path):
+    path = 'results/tbnn_results.json'
+    if not os.path.exists(path): return
+    with open(path) as f: res = json.load(f)
+    hist = res['history']
+    ep = np.arange(1, len(hist['train_mse'])+1)
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.semilogy(ep, hist['train_mse'], color='#009688', lw=2, label='Train MSE')
+    ax.semilogy(ep, hist['val_mse'],   color='#FF5722', lw=2, ls='--', label='Val MSE')
+    ax.set_xlabel('Epoch'); ax.set_ylabel('MSE Loss')
+    ax.set_title('3D Tensor Basis Neural Network (TBNN) Training')
+    ax.text(0.60, 0.80, f"Test R² = {res['r2']:.4f}\nRel. Frob = {res['frob_rel_pct']:.2f}%",
+            transform=ax.transAxes, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax.legend()
+    plt.tight_layout(); plt.savefig(save_path); plt.close()
+    print(f"  Saved: {save_path}")
+
+
+def plot_cfd_results(save_path):
+    path = 'results/cfd_results.npz'
+    if not os.path.exists(path): return
+    data = np.load(path)
+    y = data['y']; z = data['z']; ux = data['ux']
+    u_newt = data['u_newtonian_mid']; u_n2x = data['u_centerline_n2x']
+    trC_mid = data['trC_centerline']
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
+
+    # Contour of 3D Velocity
+    ax = axes[0]
+    Y, Z = np.meshgrid(y, z, indexing='ij')
+    c = ax.contourf(Y, Z, ux, 20, cmap='viridis')
+    plt.colorbar(c, ax=ax, label=r'Velocity $u_x(y,z)$')
+    ax.set_xlabel('y'); ax.set_ylabel('z')
+    ax.set_title('A — 3D CFD Velocity Field $u_x(y,z)$')
+
+    # Centerline Velocity Profile
+    ax = axes[1]
+    ax.plot(y, u_newt, color='#9E9E9E', lw=2.5, ls='--', label='Newtonian Poiseuille')
+    ax.plot(y, u_n2x,  color='#2196F3', lw=2.5, label='Viscoelastic N2X Coupled')
+    ax.set_xlabel('Channel Position y'); ax.set_ylabel(r'Velocity $u_x(y, z=0)$')
+    ax.set_title('B — Centerline Velocity Profile')
+    ax.legend()
+
+    # Centerline Polymer Extension tr(C)
+    ax = axes[2]
+    ax.plot(y, trC_mid, color='#E91E63', lw=2.5)
+    ax.set_xlabel('Channel Position y'); ax.set_ylabel(r'Polymer Trace tr$(C)$')
+    ax.set_title(r'C — Polymer Stretch tr$(C)$ Profile')
+
+    fig.suptitle('3D Multi-Scale CFD Simulation Results (N2X Neural Coupling)', fontweight='bold', y=1.02)
+    plt.tight_layout(); plt.savefig(save_path); plt.close()
+    print(f"  Saved: {save_path}")
+
+
 if __name__ == '__main__':
     print("Loading 3D results …")
     data = load_results()
@@ -351,4 +455,11 @@ if __name__ == '__main__':
     plot_dashboard_3d(data,
         'results/plots/fig9_dashboard.png')
 
-    print("\nAll 3D plots generated ✓")
+    # Research Extension Plots
+    plot_pinn_results('results/plots/fig10_pinn_results.png')
+    plot_spectral_equivariance('results/plots/fig11_spectral_equivariance.png')
+    plot_tbnn_results('results/plots/fig12_tbnn_results.png')
+    plot_cfd_results('results/plots/fig13_cfd_multiscale.png')
+
+    print("\nAll 3D plots (Standard + Research Extensions) generated ✓")
+

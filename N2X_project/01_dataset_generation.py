@@ -1,6 +1,6 @@
 """
 ================================================================================
-N2X Model — Task 1 & 2 & 3 & 4: Dataset Generation (3D Formulation)
+N2X Model :  Dataset Generation (3D Formulation)
 ================================================================================
 Project : Machine Learning Based Modeling of Non-Newtonian Fluids (N2X 3D)
 Author  : Raveendra
@@ -149,6 +149,18 @@ def tensor_invariants(C: np.ndarray) -> np.ndarray:
     return np.array([I1, I2, I3, I4], dtype=np.float64)
 
 
+def exact_ensemble_closure(r: np.ndarray, p: DumbbellParams) -> np.ndarray:
+    """
+    Exact microscopic kinetic ensemble closure tensor for FENE dumbbells in 3D:
+        Ω = (2H / ζ) * ⟨ (r rᵀ) / (1 - |r|²/b) ⟩ - (2kT / ζ) * I₃
+    """
+    r2 = np.sum(r**2, axis=1, keepdims=True)
+    denom = np.maximum(1.0 - r2 / p.b, 1e-4)
+    weighted_rrT = (r[:, :, np.newaxis] * r[:, np.newaxis, :]) / denom[:, :, np.newaxis]
+    avg_weighted = np.mean(weighted_rrT, axis=0)
+    return (2.0 * p.H / p.zeta) * avg_weighted - (2.0 * p.kT / p.zeta) * np.eye(3)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. 3D SIMULATION — GENERATE ONE TRAJECTORY
 # ─────────────────────────────────────────────────────────────────────────────
@@ -166,16 +178,12 @@ def simulate_trajectory(kappa: np.ndarray,
     closures = np.zeros((N_steps, 3, 3))
 
     for step in range(N_steps):
-        C_old    = conformation_tensor(r)
-        r        = euler_maruyama_step(r, kappa, dt, p, rng)
-        C_new    = conformation_tensor(r)
-        C_traj[step + 1] = C_new
-
-        transport      = kappa @ C_old + C_old @ kappa.T
-        dC_dt          = (C_new - C_old) / dt
-        closures[step] = transport - dC_dt
+        closures[step]   = exact_ensemble_closure(r, p)
+        r                = euler_maruyama_step(r, kappa, dt, p, rng)
+        C_traj[step + 1] = conformation_tensor(r)
 
     return {'C_traj': C_traj, 'kappa': kappa, 'closure': closures, 'dt': dt}
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

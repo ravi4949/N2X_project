@@ -1,6 +1,6 @@
 """
 ================================================================================
-N2X Model — Task 5, 6, 7: Neural Network Definition + Training (3D High-Precision)
+N2X Model : Neural Network Definition + Training (3D High-Precision)
 ================================================================================
 Architecture for 3D closure model:
     Input (13) → Dense(128, tanh) → Dense(128, tanh) → Dense(64, tanh) → Output(6)

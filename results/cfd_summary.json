@@ -1,0 +1,12 @@
+{
+  "grid_size": [
+    25,
+    25
+  ],
+  "n_steps": 300,
+  "u_max_n2x": 0.5493832890856001,
+  "u_max_newtonian": 2.0,
+  "trC_max": 3.0,
+  "tau_xy_max": 1.2948014364349816,
+  "simulation_time_sec": 19.791245222091675
+}
